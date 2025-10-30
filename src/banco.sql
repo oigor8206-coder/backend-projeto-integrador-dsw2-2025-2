@@ -5,36 +5,36 @@
 -- Limpeza de Tabelas Existentes
 -- Garante que o script possa ser executado várias vezes sem erros.
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS Encomendas;
-DROP TABLE IF EXISTS Usuarios;
+DROP TABLE IF EXISTS "Encomendas";
+DROP TABLE IF EXISTS "Usuarios";
 
 -- -----------------------------------------------------
 -- Tabela Usuario
 -- Armazena as informações dos usuários do sistema.
 -- -----------------------------------------------------
-CREATE TABLE Usuarios (
-  id SERIAL PRIMARY KEY, -- 'SERIAL' é o tipo auto-incremento do PostgreSQL
-  nome VARCHAR(255) NOT NULL, -- Nome completo do usuário
-  email VARCHAR(255) UNIQUE NOT NULL, -- Endereço de e-mail único
-  senha_hash VARCHAR(255) NOT NULL, -- Senha do usuário armazenada de forma segura
-  papel SMALLINT NOT NULL CHECK (papel IN (0, 1)),
-  data_criacao TIMESTAMP DEFAULT NOW(), -- Data de criação com fuso horário
-  data_atualizacao TIMESTAMP DEFAULT NOW() -- Data de atualização com fuso horário
+CREATE TABLE "Usuarios" (
+"id"                SERIAL PRIMARY KEY, -- 'SERIAL' é o tipo auto-incremento do PostgreSQL
+"nome"              VARCHAR(255) NOT NULL, -- Nome completo do usuário
+"email"             VARCHAR(255) UNIQUE NOT NULL, -- Endereço de e-mail único
+"senha_hash"        VARCHAR(255) NOT NULL, -- Senha do usuário armazenada de forma segura
+"papel"             SMALLINT NOT NULL CHECK ("papel" IN (0, 1)),
+"data_criacao"      TIMESTAMP DEFAULT NOW(), -- Data de criação com fuso horário
+"data_atualizacao"  TIMESTAMP DEFAULT NOW() -- Data de atualização com fuso horário
 );
 
 -- -----------------------------------------------------
 -- Tabela Encomenda
 -- Armazena os detalhes das encomendas feitas pelos usuários.
 -- -----------------------------------------------------
-CREATE TABLE Encomendas (
-  id SERIAL PRIMARY KEY, -- Identificador único para cada encomenda
-  usuarios_id INT NOT NULL REFERENCES Usuarios(id), -- Chave estrangeira referenciando o usuário
-  material VARCHAR(50) NOT NULL, -- Tipo de material da encomenda
-  chumbo INT NOT NULL, -- Especificação do chumbo
-  peso_laco DECIMAL(10, 2), -- Peso do laço, campo opcional
-  cor VARCHAR(50) NOT NULL, -- Cor do produto encomendado
-  data_criacao TIMESTAMP DEFAULT NOW(), -- Data de criação com fuso horário
-  data_atualizacao TIMESTAMP DEFAULT NOW() -- Data de atualização com fuso horário
+CREATE TABLE "Encomendas" (
+  "id"                SERIAL PRIMARY KEY, -- Identificador único para cada encomenda
+  "usuarios_id"       INT NOT NULL REFERENCES "Usuarios"("id"), -- Chave estrangeira referenciando o usuário
+  "material"          VARCHAR(50) NOT NULL, -- Tipo de material da encomenda
+  "chumbo"            INT NOT NULL, -- Especificação do chumbo
+  "peso_laco"         DECIMAL(10, 2), -- Peso do laço, campo opcional
+  "cor"               VARCHAR(50) NOT NULL, -- Cor do produto encomendado
+  "data_criacao"      TIMESTAMP DEFAULT NOW(), -- Data de criação com fuso horário
+  "data_atualizacao"  TIMESTAMP DEFAULT NOW() -- Data de atualização com fuso horário
 );
 
 -- -----------------------------------------------------
@@ -42,7 +42,7 @@ CREATE TABLE Encomendas (
 -- -----------------------------------------------------
 
 -- Inserção na tabela Usuarios
-INSERT INTO Usuarios (nome, email, senha_hash, papel) VALUES
+INSERT INTO "Usuarios" ("nome", "email", "senha_hash", "papel") VALUES
 ('Ana Souza', 'ana@exemplo.com', '$2a$10$hash_exemplo_1', 0),
 ('Carlos Silva', 'carlos@exemplo.com', '$2a$10$hash_exemplo_2', 1),
 ('Beatriz Costa', 'bia@exemplo.com', '$2a$10$hash_exemplo_3', 0),
@@ -58,7 +58,7 @@ INSERT INTO Usuarios (nome, email, senha_hash, papel) VALUES
 
 
 -- Inserção na tabela Encomendas
-INSERT INTO Encomendas (usuarios_id, material, chumbo, peso_laco, cor) VALUES
+INSERT INTO "Encomendas" ("usuarios_id", "material", "chumbo", "peso_laco", "cor") VALUES
 (1, 'couro', 5, 700.50, 'azul'),
 (2, 'nylon', 3, 650.00, 'vermelho'),
 (1, 'sintético', 4, 680.75, 'preto'),

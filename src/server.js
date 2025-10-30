@@ -68,7 +68,7 @@ app.get("/", async (_req, res) => {
 app.get("/api/encomendas", async (_req, res) => {
     try {
         // Desestruturamos o objeto retornado para extrair a propriedade `rows`.
-        const { rows } = await pool.query("SELECT * FROM encomendas ORDER BY id DESC");
+        const { rows } = await pool.query(`SELECT * FROM "Encomendas" ORDER BY "id" DESC`);
         res.json(rows); // Retorna um array de objetos, onde cada objeto representa uma encomenda.
     } catch {
         res.status(500).json({ erro: "erro interno" });
@@ -91,7 +91,7 @@ app.get("/api/encomendas/:id", async (req, res) => {
 
     try {
         // Consulta parametrizada: o valor de `id` substitui `$1`.
-        const result = await pool.query("SELECT * FROM encomendas WHERE id = $1", [id]);
+        const result = await pool.query(`SELECT * FROM "Encomendas" WHERE "id" = $1`, [id]);
 
         // `rows` é um array de linhas. Se o primeiro elemento não existe, a encomenda não foi encontrada.
         const { rows } = result;
@@ -129,7 +129,7 @@ app.post("/api/encomendas", async (req, res) => {
     try {
         // Executa o INSERT e usa `RETURNING *` para obter a linha recém-criada.
         const { rows } = await pool.query(
-            "INSERT INTO encomendas (usuarios_id, material, chumbo, peso_laco, cor) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+            `INSERT INTO "Encomendas" ("usuarios_id", "material", "chumbo", "peso_laco", "cor") VALUES ($1, $2, $3, $4, $5) RETURNING *`,
             [user_id, material, c, peso, cor]
         );
 
@@ -169,13 +169,13 @@ app.put("/api/encomendas/:id", async (req, res) => {
     try {
         // Atualiza todos os campos da encomenda.
         const { rows } = await pool.query(
-            `UPDATE encomendas SET 
-                usuarios_id = $1,
-                material = $2,
-                chumbo = $3,
-                peso_laco = $4,
-                cor = $5
-            WHERE id = $6
+            `UPDATE "Encomendas" SET 
+                "usuarios_id" = $1,
+                "material" = $2,
+                "chumbo" = $3,
+                "peso_laco" = $4,
+                "cor" = $5
+            WHERE "id" = $6
             RETURNING *`,
             [user_id, material, c, peso, cor, id]
         );
@@ -245,13 +245,13 @@ app.patch("/api/encomendas/:id", async (req, res) => {
         // Se um campo como `material` for `undefined` no corpo da requisição, ele é passado como `null` para o SQL.
         // `COALESCE($2, material)` então irá manter o valor original de `material` no banco de dados.
         const { rows } = await pool.query(
-            `UPDATE encomendas SET
-                usuarios_id = COALESCE($1, usuarios_id), 
-                material = COALESCE($2, material), 
-                chumbo = COALESCE($3, chumbo), 
-                peso_laco = COALESCE($4, peso_laco),
-                cor = COALESCE($5, cor)
-            WHERE id = $6 RETURNING *`,
+            `UPDATE "Encomendas" SET
+                "usuarios_id" = COALESCE($1, "usuarios_id"), 
+                "material" = COALESCE($2, "material"), 
+                "chumbo" = COALESCE($3, "chumbo"), 
+                "peso_laco" = COALESCE($4, "peso_laco"),
+                "cor" = COALESCE($5, "cor")
+            WHERE "id" = $6 RETURNING *`,
             [user_id ?? null, material ?? null, c ?? null, peso ?? null, cor ?? null, id]
         );
 
@@ -277,7 +277,7 @@ app.delete("/api/encomendas/:id", async (req, res) => {
 
     try {
         // A consulta `DELETE ... RETURNING id` nos permite saber se alguma linha foi afetada.
-        const r = await pool.query("DELETE FROM encomendas WHERE id = $1 RETURNING id", [id]);
+        const r = await pool.query(`DELETE FROM "Encomendas" WHERE "id" = $1 RETURNING "id"`, [id]);
 
         // `r.rowCount` é o número de linhas que foram excluídas. Se for 0, o ID não existe.
         if (r.rowCount === 0) return res.status(404).json({ erro: "não encontrado" });
