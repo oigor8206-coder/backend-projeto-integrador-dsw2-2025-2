@@ -118,6 +118,8 @@ app.post("/api/encomendas", async (req, res) => {
     const c = Number(chumbo);
     const peso = Number(peso_laco);
 
+    console.log(req.body);
+
     // Validação dos dados recebidos.
     if (!material || typeof (material) !== 'string' ||
         !cor || typeof (cor) !== 'string' ||
