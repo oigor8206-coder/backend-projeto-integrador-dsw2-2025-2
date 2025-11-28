@@ -12,6 +12,7 @@ import jwt from "jsonwebtoken";           // Biblioteca para assinar/verificar J
 import bcrypt from "bcryptjs";            // Biblioteca para hashing e verificação de senha
 import dotenv from "dotenv";              // Carrega variáveis do .env em process.env
 import { pool } from "../database/db.js"; // Pool do Postgres para consultas ao banco
+import { authMiddleware } from "../middlewares/auth.js";  
 
 dotenv.config();                          // Inicializa dotenv (deixa segredos acessíveis via process.env)
 const router = Router();                  // Cria um roteador isolado para montar em /api/usuarios (por exemplo)
@@ -144,7 +145,7 @@ router.post("/register", async (req, res) => {
   // 2) gera hash da senha;
   // 3) insere usuário como papel padrão (0);
   // 4) emite access + refresh e grava o refresh em cookie HttpOnly.
-  const { nome, email, senha } = req.body ?? {};
+  const { nome, email, senha, papel } = req.body ?? {};
   if (!nome || !email || !senha) {
     return res.status(400).json({ erro: "nome, email e senha são obrigatórios" });
   }
@@ -153,14 +154,16 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    const senha_hash = await bcrypt.hash(senha, 12); // custo 12: equilibrado entre segurança e performance
-    const papel = 0;
+    const senha_hash = await bcrypt.hash(senha, 12);
+    
+    // Validação simples: se vier 1, usa 1. Qualquer outra coisa vira 0 (segurança padrão)
+    const papelDefinido = Number(papel) === 1 ? 1 : 0;
 
     const r = await pool.query(
-      `INSERT INTO "Usuarios" ("nome","email","senha_hash","papel")
-       VALUES ($1,$2,$3,$4)
-       RETURNING "id","nome","email","papel"`,
-      [String(nome).trim(), String(email).trim().toLowerCase(), senha_hash, papel]
+        `INSERT INTO "Usuarios" ("nome","email","senha_hash","papel")
+         VALUES ($1,$2,$3,$4)
+         RETURNING "id","nome","email","papel"`,
+        [String(nome).trim(), String(email).trim().toLowerCase(), senha_hash, papelDefinido]
     );
     const u = r.rows[0];
 
@@ -185,6 +188,73 @@ router.post("/logout", async (req, res) => {
   // “Logout” stateless: apenas remove o cookie de refresh no cliente
   clearRefreshCookie(res, req);
   return res.status(204).end();
+});
+// ATUALIZAR USUÁRIO (requer login)
+router.put("/:id", authMiddleware, async (req, res) => {
+  const id = Number(req.params.id);
+  const { nome, email, senha } = req.body;
+  const uid = req.user.id;
+  const isAdmin = req.user.papel === 1;
+
+  // Regra de segurança: só o próprio usuário ou admin pode alterar
+  if (uid !== id && !isAdmin) {
+      return res.status(403).json({ erro: "sem permissão" });
+  }
+
+  try {
+      // Se enviou senha, faz hash. Se não, ignora.
+      let senhaQueryPart = "";
+      const params = [nome, email, id];
+      let paramIndex = 4;
+
+      if (senha && senha.length >= 6) {
+          const senha_hash = await bcrypt.hash(senha, 12);
+          params.push(senha_hash);
+          senhaQueryPart = `, "senha_hash" = $${paramIndex - 1}`;
+      }
+
+      const { rows } = await pool.query(
+          `UPDATE "Usuarios"
+           SET "nome" = $1, "email" = $2 ${senhaQueryPart}, "data_atualizacao" = now()
+           WHERE "id" = $3
+           RETURNING "id", "nome", "email", "papel"`,
+          params
+      );
+
+      if (!rows[0]) return res.status(404).json({ erro: "usuário não encontrado" });
+      res.json(rows[0]);
+  } catch (err) {
+      if (err?.code === "23505") return res.status(409).json({ erro: "email já em uso" });
+      res.status(500).json({ erro: "erro interno" });
+  }
+});
+
+// DELETAR USUÁRIO (requer login)
+router.delete("/:id", authMiddleware, async (req, res) => {
+  const id = Number(req.params.id);
+  const uid = req.user.id;
+  const isAdmin = req.user.papel === 1;
+
+  if (uid !== id && !isAdmin) {
+      return res.status(403).json({ erro: "sem permissão" });
+  }
+
+  try {
+      // Remove primeiro os chamados dependentes (ou configure CASCADE no banco)
+      await pool.query(`DELETE FROM "Chamados" WHERE "Usuarios_id" = $1`, [id]);
+
+      const { rowCount } = await pool.query(`DELETE FROM "Usuarios" WHERE "id" = $1`, [id]);
+
+      if (rowCount === 0) return res.status(404).json({ erro: "usuário não encontrado" });
+
+      // Se for o próprio usuário se deletando, limpa o cookie
+      if (uid === id) clearRefreshCookie(res, req);
+
+      res.status(204).end();
+  } catch (err) {
+      console.error(err);
+      res.status(500).json({ erro: "erro ao excluir conta" });
+  }
 });
 
 export default router;              // Exporta o roteador para ser montado no servidor principal
