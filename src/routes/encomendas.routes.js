@@ -1,6 +1,5 @@
 // src/routes/encomendas.routes.js
 import { Router } from "express";
-import { unlink } from 'node:fs/promises'; // unlink do fs para apagar arquivo
 import { pool } from "../database/db.js";
 import multer from "multer"; // import do multer
 import path from "path";     // import do path

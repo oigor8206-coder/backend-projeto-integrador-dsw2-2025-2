@@ -140,49 +140,67 @@ router.post("/refresh", async (req, res) => {
 });
 
 router.post("/register", async (req, res) => {
-  // Cadastro simples:
+   // Cadastro simples:
   // 1) valida campos mínimos;
   // 2) gera hash da senha;
   // 3) insere usuário como papel padrão (0);
   // 4) emite access + refresh e grava o refresh em cookie HttpOnly.
   const { nome, email, senha, papel } = req.body ?? {};
+  const papelNumber = Number.parseInt(papel);
   if (!nome || !email || !senha) {
-    return res.status(400).json({ erro: "nome, email e senha são obrigatórios" });
+    return res
+      .status(400)
+      .json({ erro: "nome, email e senha são obrigatórios" });
   }
   if (String(senha).length < 6) {
-    return res.status(400).json({ erro: "senha deve ter pelo menos 6 caracteres" });
+    return res
+      .status(400)
+      .json({ erro: "senha deve ter pelo menos 6 caracteres" });
+  }
+  if (Number.isNaN(papelNumber) || papelNumber < 0 || papelNumber > 1) {
+    return res.status(400).json({ erro: "papel inválido!" });
   }
 
   try {
-    const senha_hash = await bcrypt.hash(senha, 12);
-    
-    // Validação simples: se vier 1, usa 1. Qualquer outra coisa vira 0 (segurança padrão)
-    const papelDefinido = Number(papel) === 1 ? 1 : 0;
+    const senha_hash = await bcrypt.hash(senha, 12); // custo 12: equilibrado entre segurança e performance
 
     const r = await pool.query(
-        `INSERT INTO "Usuarios" ("nome","email","senha_hash","papel")
-         VALUES ($1,$2,$3,$4)
-         RETURNING "id","nome","email","papel"`,
-        [String(nome).trim(), String(email).trim().toLowerCase(), senha_hash, papelDefinido]
+      `INSERT INTO "Usuarios" ("nome","email","senha_hash","papel")
+             VALUES ($1,$2,$3,$4)
+             RETURNING "id","nome","email","papel"`,
+      [
+        String(nome).trim(),
+        String(email).trim().toLowerCase(),
+        senha_hash,
+        papel,
+      ]
     );
-    const u = r.rows[0];
+    const user = r.rows[0];
 
-    const access_token = signAccessToken(u);
-    const refresh_token = signRefreshToken(u);
+    const access_token = signAccessToken(user);
+    const refresh_token = signRefreshToken(user);
     setRefreshCookie(res, req, refresh_token);
 
     return res.status(201).json({
       token_type: "Bearer",
       access_token,
       expires_in: JWT_ACCESS_EXPIRES,
-      user: { id: u.id, nome: u.nome, email: u.email, papel: u.papel },
+      user: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        papel: user.papel,
+      },
     });
   } catch (err) {
     // Código 23505 (Postgres) indica violação de UNIQUE (e.g. email já cadastrado)
-    if (err?.code === "23505") return res.status(409).json({ erro: "email já cadastrado" });
+    console.log(err);
+    if (err?.code === "23505")
+      return res.status(409).json({ erro: "email já cadastrado" });
     return res.status(500).json({ erro: "erro interno" });
   }
 });
+
 
 router.post("/logout", async (req, res) => {
   // “Logout” stateless: apenas remove o cookie de refresh no cliente
@@ -190,11 +208,12 @@ router.post("/logout", async (req, res) => {
   return res.status(204).end();
 });
 // ATUALIZAR USUÁRIO (requer login)
+// Modificado para tornar a senha opcional
 router.put("/:id", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
-  const { nome, email, senha } = req.body;
+  const { nome, email, senha } = req.body ?? {};
   const uid = req.user.id;
-  const isAdmin = req.user.papel === 1;
+  const isAdmin = req.user.papel === 0;
 
   // Regra de segurança: só o próprio usuário ou admin pode alterar
   if (uid !== id && !isAdmin) {
@@ -202,24 +221,29 @@ router.put("/:id", authMiddleware, async (req, res) => {
   }
 
   try {
-      // Se enviou senha, faz hash. Se não, ignora.
-      let senhaQueryPart = "";
-      const params = [nome, email, id];
-      let paramIndex = 4;
+      // Lógica para senha opcional
+      let query = "";
+      let params = [];
 
-      if (senha && senha.length >= 6) {
+      if (senha && senha.trim().length >= 6) {
+          // Se a senha foi fornecida e é válida, atualiza tudo
           const senha_hash = await bcrypt.hash(senha, 12);
-          params.push(senha_hash);
-          senhaQueryPart = `, "senha_hash" = $${paramIndex - 1}`;
+          query = `UPDATE "Usuarios"
+                   SET "nome" = $1, "email" = $2, "senha_hash" = $3, "data_atualizacao" = now()
+                   WHERE "id" = $4
+                   RETURNING "id", "nome", "email", "papel"`;
+          params = [nome, email, senha_hash, id];
+      } else {
+          // Se a senha NÃO foi fornecida (ou é vazia), atualiza apenas nome e email
+          // Mantém a senha antiga
+          query = `UPDATE "Usuarios"
+                   SET "nome" = $1, "email" = $2, "data_atualizacao" = now()
+                   WHERE "id" = $3
+                   RETURNING "id", "nome", "email", "papel"`;
+          params = [nome, email, id];
       }
 
-      const { rows } = await pool.query(
-          `UPDATE "Usuarios"
-           SET "nome" = $1, "email" = $2 ${senhaQueryPart}, "data_atualizacao" = now()
-           WHERE "id" = $3
-           RETURNING "id", "nome", "email", "papel"`,
-          params
-      );
+      const { rows } = await pool.query(query, params);
 
       if (!rows[0]) return res.status(404).json({ erro: "usuário não encontrado" });
       res.json(rows[0]);
@@ -241,7 +265,7 @@ router.delete("/:id", authMiddleware, async (req, res) => {
 
   try {
       // Remove primeiro os chamados dependentes (ou configure CASCADE no banco)
-      await pool.query(`DELETE FROM "Chamados" WHERE "Usuarios_id" = $1`, [id]);
+      await pool.query(`DELETE FROM "Encomendas" WHERE "usuarios_id" = $1`, [id]);
 
       const { rowCount } = await pool.query(`DELETE FROM "Usuarios" WHERE "id" = $1`, [id]);
 
