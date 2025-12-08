@@ -49,6 +49,9 @@ router.get("/:id", async (req, res) => {
         // Consulta parametrizada: o valor de `id` substitui `$1`.
         const result = await pool.query(`SELECT * FROM "Encomendas" WHERE "id" = $1`, [id]);
 
+        
+
+
         // `rows` é um array de linhas. Se o primeiro elemento não existe, a encomenda não foi encontrada.
         const { rows } = result;
         if (!rows[0]) return res.status(404).json({ erro: "não encontrado" });
@@ -61,17 +64,18 @@ router.get("/:id", async (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// CRIAR (POST /encomendas)
+// CRIAR (POST /api/encomendas) - CORREÇÃO
 // -----------------------------------------------------------------------------
 // Esta rota insere uma nova encomenda no banco de dados.
 // É esperado um corpo de requisição JSON com os dados necessários.
 // Usamos `?? {}` para garantir que `req.body` seja um objeto, mesmo que o corpo esteja vazio.
-router.post("post/", async (req, res) => {
+router.post("/", async (req, res) => {  // CORREÇÃO: URL correta "/"
     // Extrai os campos do corpo da requisição e converte os valores numéricos.
-    const { usuarios_id, material, chumbo, peso_laco, cor } = req.body ?? {};
+    const { usuarios_id, material, chumbo, peso_laco, cor, observacoes} = req.body ?? {};
     const user_id = Number(usuarios_id);
     const c = Number(chumbo);
     const peso = Number(peso_laco);
+    const obs = (observacoes);
 
     console.log(req.body);
 

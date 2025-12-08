@@ -33,6 +33,7 @@ CREATE TABLE "Encomendas" (
   "chumbo"            INT NOT NULL, -- Especificação do chumbo
   "peso_laco"         DECIMAL(10, 2), -- Peso do laço, campo opcional
   "cor"               VARCHAR(50) NOT NULL, -- Cor do produto encomendado
+  "observacoes"      VARCHAR(250), -- Campo para observações adicionais, opcional
   "data_criacao"      TIMESTAMP DEFAULT NOW(), -- Data de criação com fuso horário
   "data_atualizacao"  TIMESTAMP DEFAULT NOW() -- Data de atualização com fuso horário
 );
